@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Sistema.Datos;
 using Sistema.Entidades.Almacen;
+using Sistema.Web.Models.Almacen.Categoria;
 
 namespace Sistema.Web.Controllers
 {
@@ -21,16 +22,23 @@ namespace Sistema.Web.Controllers
             _context = context;
         }
 
-        // GET: api/Categorias
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Categoria>>> GetCategorias()
+        // GET: api/Categorias/Listar
+        [HttpGet("[action]")]
+        public async Task<IEnumerable<CategoriaViewModel>> Listar()
         {
-            return await _context.Categorias.ToListAsync();
+            var categoria = await _context.Categorias.ToListAsync();
+            return categoria.Select(c => new CategoriaViewModel
+            { 
+                idcategoria = c.idcategoria,
+                nombre = c.nombre,
+                descripcion = c.descripcion,
+                condicion = c.condicion
+            });
         }
 
-        // GET: api/Categorias/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Categoria>> GetCategoria(int id)
+        // GET: api/Categorias/Mostrar/5
+        [HttpGet("[action]/{id}")]
+        public async Task<ActionResult<Categoria>> Mostrar([FromRoute] int id)
         {
             var categoria = await _context.Categorias.FindAsync(id);
 
@@ -39,21 +47,40 @@ namespace Sistema.Web.Controllers
                 return NotFound();
             }
 
-            return categoria;
+            return Ok(new CategoriaViewModel
+            {
+                idcategoria = categoria.idcategoria,
+                nombre = categoria.nombre,
+                descripcion = categoria.descripcion,
+                condicion = categoria.condicion
+            });
         }
 
-        // PUT: api/Categorias/5
+        // PUT: api/Categorias/Actualizar
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for
         // more details see https://aka.ms/RazorPagesCRUD.
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutCategoria(int id, Categoria categoria)
+        [HttpPut("[action]/")]
+        public async Task<IActionResult> Actualizar([FromBody] ActualizarViewModel model)
         {
-            if (id != categoria.idcategoria)
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (model.idcategoria < 0)
             {
                 return BadRequest();
             }
 
-            _context.Entry(categoria).State = EntityState.Modified;
+            var categoria = await _context.Categorias.FirstOrDefaultAsync(c => c.idcategoria == model.idcategoria);
+
+            if (categoria == null)
+            {
+                return NotFound();
+            }
+
+            categoria.nombre = model.nombre;
+            categoria.descripcion = model.descripcion;
 
             try
             {
@@ -61,29 +88,42 @@ namespace Sistema.Web.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CategoriaExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                //TODO guardar excepcion en un log
+                return BadRequest();
             }
 
-            return NoContent();
+            return Ok();
         }
 
-        // POST: api/Categorias
+        // POST: api/Categorias/Crear
         // To protect from overposting attacks, please enable the specific properties you want to bind to, for
         // more details see https://aka.ms/RazorPagesCRUD.
-        [HttpPost]
-        public async Task<ActionResult<Categoria>> PostCategoria(Categoria categoria)
+        [HttpPost("[action]")]
+        public async Task<ActionResult<Categoria>> Crear([FromBody] CrearViewModel model)
         {
-            _context.Categorias.Add(categoria);
-            await _context.SaveChangesAsync();
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
 
-            return CreatedAtAction("GetCategoria", new { id = categoria.idcategoria }, categoria);
+            Categoria categoria = new Categoria
+            {
+                nombre = model.nombre,
+                descripcion = model.descripcion,
+                condicion = true
+            };
+
+            _context.Categorias.Add(categoria);
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest();
+            }
+
+            return Ok();
         }
 
         // DELETE: api/Categorias/5
